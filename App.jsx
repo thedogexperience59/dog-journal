@@ -833,14 +833,17 @@ function AdminResourcesView({ onBack }) {
     setSaving(true);
     try {
       if (editing) {
-        await supaFetch(`/resources?id=eq.${editing}`, { method: "PATCH", body: JSON.stringify(form) });
+        await supaFetch(`/resources?id=eq.${editing}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify(form) });
       } else {
-        await supaFetch("/resources", { method: "POST", body: JSON.stringify(form) });
+        await supaFetch("/resources", { method: "POST", prefer: "return=minimal", body: JSON.stringify(form) });
       }
       setShowForm(false);
       setEditing(null);
       await loadArticles();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error("Erreur saveArticle:", e);
+      alert("Erreur : " + e.message);
+    }
     setSaving(false);
   }
 
