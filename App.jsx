@@ -5,8 +5,8 @@ import {
 
 // ─── SUPABASE CONFIG ──────────────────────────────────────────────────────────
 // ⚠️  Replace these with YOUR Supabase values (see setup guide below)
-const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
+const SUPABASE_URL = "https://kmlfkvydiotnkmtkaafx.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttbGZrdnlkaW90bmttdGthYWZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMTQwOTAsImV4cCI6MjA4ODg5MDA5MH0.qcujyvv2gUaBIcEpFx20VJR-BxepJE4P8shgMrE2G0c";
 
 async function supaFetch(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
