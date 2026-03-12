@@ -5,8 +5,8 @@ import {
 
 // ─── SUPABASE CONFIG ──────────────────────────────────────────────────────────
 // ⚠️  Replace these with YOUR Supabase values (see setup guide below)
-const SUPABASE_URL = "https://kmlfkvydiotnkmtkaafx.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttbGZrdnlkaW90bmttdGthYWZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMTQwOTAsImV4cCI6MjA4ODg5MDA5MH0.qcujyvv2gUaBIcEpFx20VJR-BxepJE4P8shgMrE2G0c";
+const SUPABASE_URL = "https://vfvtimkkwczagytnjtfn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmdnRpbWtrd2N6YWd5dG5qdGZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMzYwMDcsImV4cCI6MjA4ODkxMjAwN30.wqff8qY_Zw7ejMBTxVRJtKiAm5jVp8LzIbX3nIvrMo8";
 
 async function supaFetch(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
