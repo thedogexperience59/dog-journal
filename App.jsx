@@ -676,7 +676,7 @@ function ResourcesView({ clientName }) {
   async function loadArticles() {
     setLoading(true);
     try {
-      const data = await supaFetch("/resources?order=created_at.desc");
+      const data = await supaFetch("/articles?order=created_at.desc");
       setArticles(data);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -819,7 +819,7 @@ function AdminResourcesView({ onBack }) {
   async function loadArticles() {
     setLoading(true);
     try {
-      const data = await supaFetch("/resources?order=created_at.desc");
+      const data = await supaFetch("/articles?order=created_at.desc");
       setArticles(data);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -833,9 +833,9 @@ function AdminResourcesView({ onBack }) {
     setSaving(true);
     try {
       if (editing) {
-        await supaFetch(`/resources?id=eq.${editing}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify(form) });
+        await supaFetch(`/articles?id=eq.${editing}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify(form) });
       } else {
-        await supaFetch("/resources", { method: "POST", prefer: "return=minimal", body: JSON.stringify(form) });
+        await supaFetch("/articles", { method: "POST", prefer: "return=minimal", body: JSON.stringify(form) });
       }
       setShowForm(false);
       setEditing(null);
@@ -849,7 +849,7 @@ function AdminResourcesView({ onBack }) {
 
   async function deleteArticle(id) {
     try {
-      await supaFetch(`/resources?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" });
+      await supaFetch(`/articles?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" });
       setConfirmDelete(null);
       await loadArticles();
     } catch (e) { console.error(e); }
