@@ -396,7 +396,7 @@ function ClientView() {
 }
 
 // ─── ADMIN VIEW ───────────────────────────────────────────────────────────────
-function AdminView({ onLogout }) {
+function AdminView({ onLogout, onManageResources }) {
   const [dogs, setDogs] = useState([]);
   const [selected, setSelected] = useState(null);
   const [dogEntries, setDogEntries] = useState([]);
@@ -487,7 +487,7 @@ function AdminView({ onLogout }) {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Logo size={48} />
           <div>
@@ -495,10 +495,13 @@ function AdminView({ onLogout }) {
             <p style={{ fontFamily: "'Nunito', sans-serif", color: colors.muted, fontSize: 13, margin: 0 }}>The Dog Experience</p>
           </div>
         </div>
-        <button onClick={onLogout} style={{ ...styles.btnSecondary, padding: "8px 16px", fontSize: 13 }}>
+        <button onClick={onLogout} style={{ ...styles.btnSecondary, padding: "8px 16px", fontSize: 13, width: "auto" }}>
           Déconnexion
         </button>
       </div>
+      <button onClick={onManageResources} style={{ ...styles.btnSecondary, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        📚 Gérer les Ressources
+      </button>
 
       {!selected ? (
         <>
@@ -659,10 +662,300 @@ function AdminLogin({ onLogin }) {
   );
 }
 
+
+// ─── RESOURCES VIEW (CLIENT) ──────────────────────────────────────────────────
+function ResourcesView({ clientName }) {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedCat, setSelectedCat] = useState("Tous");
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => { loadArticles(); }, []);
+
+  async function loadArticles() {
+    setLoading(true);
+    try {
+      const data = await supaFetch("/resources?order=created_at.desc");
+      setArticles(data);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
+
+  const categories = ["Tous", ...Array.from(new Set(articles.map(a => a.category).filter(Boolean)))];
+
+  const filtered = articles.filter(a => {
+    const matchCat = selectedCat === "Tous" || a.category === selectedCat;
+    const q = search.toLowerCase();
+    const matchSearch = !q || a.title?.toLowerCase().includes(q) || a.summary?.toLowerCase().includes(q) || a.category?.toLowerCase().includes(q);
+    return matchCat && matchSearch;
+  });
+
+  if (selected) {
+    return (
+      <div style={styles.card}>
+        <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: colors.muted, cursor: "pointer", marginBottom: 16, padding: 0 }}>
+          ← Retour aux ressources
+        </button>
+        {selected.image_url && (
+          <img src={selected.image_url} alt={selected.title}
+            style={{ width: "100%", borderRadius: 16, marginBottom: 18, maxHeight: 220, objectFit: "cover" }} />
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          {selected.category && (
+            <span style={{ background: colors.teal + "20", color: colors.teal, borderRadius: 20, padding: "3px 12px", fontSize: 12, fontFamily: "'Nunito', sans-serif", fontWeight: 700 }}>
+              {selected.category}
+            </span>
+          )}
+        </div>
+        <h2 style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 20, color: colors.dark, marginBottom: 12, lineHeight: 1.3 }}>
+          {selected.title}
+        </h2>
+        <div style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, color: colors.text, lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 20 }}>
+          {selected.content}
+        </div>
+        {selected.video_url && (
+          <div style={{ borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
+            <iframe
+              width="100%" height="210"
+              src={selected.video_url.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/")}
+              title={selected.title}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ display: "block", borderRadius: 14 }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.card}>
+      <Logo size={56} />
+      <h2 style={{ ...styles.h2, marginBottom: 4 }}>Ressources 📚</h2>
+      <p style={{ ...styles.subtitle, marginBottom: 20 }}>Conseils & articles de votre comportementaliste</p>
+
+      <input
+        style={{ ...styles.input, marginBottom: 12 }}
+        placeholder="🔍 Rechercher un article..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+      />
+
+      {categories.length > 1 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+          {categories.map(cat => (
+            <button key={cat} onClick={() => setSelectedCat(cat)} style={{
+              padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer",
+              fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
+              background: selectedCat === cat ? colors.teal : colors.bg,
+              color: selectedCat === cat ? "#fff" : colors.muted,
+              transition: "all 0.15s",
+            }}>{cat}</button>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <p style={{ textAlign: "center", color: colors.muted, fontFamily: "'Nunito', sans-serif", padding: 40 }}>Chargement...</p>
+      ) : filtered.length === 0 ? (
+        <p style={{ textAlign: "center", color: colors.muted, fontFamily: "'Nunito', sans-serif", padding: 40 }}>
+          {search ? "Aucun article trouvé pour cette recherche." : "Aucun article pour le moment."}
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {filtered.map(article => (
+            <button key={article.id} onClick={() => setSelected(article)} style={{
+              background: colors.bg, border: `1.5px solid ${colors.border}`,
+              borderRadius: 18, padding: 0, cursor: "pointer", textAlign: "left",
+              overflow: "hidden", transition: "all 0.15s",
+            }}>
+              {article.image_url && (
+                <img src={article.image_url} alt={article.title}
+                  style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }} />
+              )}
+              <div style={{ padding: "14px 16px" }}>
+                {article.category && (
+                  <span style={{ background: colors.teal + "20", color: colors.teal, borderRadius: 20, padding: "2px 10px", fontSize: 11, fontFamily: "'Nunito', sans-serif", fontWeight: 700 }}>
+                    {article.category}
+                  </span>
+                )}
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 15, color: colors.dark, margin: "8px 0 4px", lineHeight: 1.3 }}>
+                  {article.title}
+                </p>
+                {article.summary && (
+                  <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: colors.muted, margin: 0, lineHeight: 1.5 }}>
+                    {article.summary}
+                  </p>
+                )}
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.teal, fontWeight: 700, marginTop: 8 }}>
+                  Lire l'article →
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ADMIN RESOURCES MANAGER ──────────────────────────────────────────────────
+function AdminResourcesView({ onBack }) {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const emptyForm = { title: "", category: "", summary: "", content: "", image_url: "", video_url: "" };
+  const [form, setForm] = useState(emptyForm);
+
+  useEffect(() => { loadArticles(); }, []);
+
+  async function loadArticles() {
+    setLoading(true);
+    try {
+      const data = await supaFetch("/resources?order=created_at.desc");
+      setArticles(data);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
+
+  function openNew() { setForm(emptyForm); setEditing(null); setShowForm(true); }
+  function openEdit(a) { setForm({ title: a.title || "", category: a.category || "", summary: a.summary || "", content: a.content || "", image_url: a.image_url || "", video_url: a.video_url || "" }); setEditing(a.id); setShowForm(true); }
+
+  async function saveArticle() {
+    if (!form.title.trim()) return;
+    setSaving(true);
+    try {
+      if (editing) {
+        await supaFetch(`/resources?id=eq.${editing}`, { method: "PATCH", body: JSON.stringify(form) });
+      } else {
+        await supaFetch("/resources", { method: "POST", body: JSON.stringify(form) });
+      }
+      setShowForm(false);
+      setEditing(null);
+      await loadArticles();
+    } catch (e) { console.error(e); }
+    setSaving(false);
+  }
+
+  async function deleteArticle(id) {
+    try {
+      await supaFetch(`/resources?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" });
+      setConfirmDelete(null);
+      await loadArticles();
+    } catch (e) { console.error(e); }
+  }
+
+  if (showForm) {
+    return (
+      <div style={styles.card}>
+        <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: colors.muted, cursor: "pointer", marginBottom: 16, padding: 0 }}>
+          ← Annuler
+        </button>
+        <h3 style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 18, color: colors.dark, marginBottom: 20 }}>
+          {editing ? "✏️ Modifier l'article" : "✨ Nouvel article"}
+        </h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <p style={S.label}>Titre *</p>
+            <input style={styles.input} placeholder="Titre de l'article" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+          </div>
+          <div>
+            <p style={S.label}>Catégorie</p>
+            <input style={styles.input} placeholder="Ex: Réactivité, Anxiété, Balade..." value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
+          </div>
+          <div>
+            <p style={S.label}>Résumé (affiché sur la carte)</p>
+            <input style={styles.input} placeholder="Une phrase de description..." value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} />
+          </div>
+          <div>
+            <p style={S.label}>Contenu de l'article</p>
+            <textarea style={{ ...styles.input, minHeight: 140, resize: "vertical" }} placeholder="Écrivez votre article ici..." value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} />
+          </div>
+          <div>
+            <p style={S.label}>URL de l'image (optionnel)</p>
+            <input style={styles.input} placeholder="https://..." value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} />
+          </div>
+          <div>
+            <p style={S.label}>Lien vidéo YouTube (optionnel)</p>
+            <input style={styles.input} placeholder="https://www.youtube.com/watch?v=..." value={form.video_url} onChange={e => setForm({ ...form, video_url: e.target.value })} />
+          </div>
+          <button style={styles.btnPrimary} onClick={saveArticle} disabled={saving || !form.title.trim()}>
+            {saving ? "Enregistrement..." : editing ? "✅ Mettre à jour" : "✅ Publier l'article"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.card}>
+      {confirmDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+          <div style={{ background: colors.card, borderRadius: 20, padding: 28, maxWidth: 320, width: "100%", textAlign: "center" }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🗑️</div>
+            <h3 style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 17, color: colors.dark, marginBottom: 8 }}>Supprimer cet article ?</h3>
+            <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: "#EB5757", marginBottom: 20 }}>Cette action est irréversible.</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirmDelete(null)} style={{ ...styles.btnSecondary, flex: 1 }}>Annuler</button>
+              <button onClick={() => deleteArticle(confirmDelete)} style={{ flex: 1, padding: "14px", borderRadius: 14, background: "#EB5757", color: "#fff", border: "none", fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>Supprimer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div>
+          <button onClick={onBack} style={{ background: "none", border: "none", fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: colors.muted, cursor: "pointer", padding: 0, marginBottom: 4 }}>← Retour Admin</button>
+          <h3 style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 17, color: colors.dark, margin: 0 }}>📚 Mes Ressources ({articles.length})</h3>
+        </div>
+        <button onClick={openNew} style={{ padding: "10px 16px", borderRadius: 12, background: colors.teal, color: "#fff", border: "none", fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+          + Nouvel article
+        </button>
+      </div>
+
+      {loading ? (
+        <p style={{ textAlign: "center", color: colors.muted, fontFamily: "'Nunito', sans-serif", padding: 30 }}>Chargement...</p>
+      ) : articles.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <p style={{ fontSize: 40, marginBottom: 10 }}>📝</p>
+          <p style={{ fontFamily: "'Nunito', sans-serif", color: colors.muted, fontSize: 14 }}>Aucun article pour le moment.<br/>Crée ton premier article !</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {articles.map(a => (
+            <div key={a.id} style={{ background: colors.bg, border: `1.5px solid ${colors.border}`, borderRadius: 14, padding: "13px 15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {a.category && <span style={{ background: colors.teal + "20", color: colors.teal, borderRadius: 20, padding: "1px 9px", fontSize: 11, fontFamily: "'Nunito', sans-serif", fontWeight: 700 }}>{a.category}</span>}
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14, color: colors.dark, margin: "5px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</p>
+              </div>
+              <div style={{ display: "flex", gap: 7, marginLeft: 10 }}>
+                <button onClick={() => openEdit(a)} style={{ width: 34, height: 34, borderRadius: 10, background: colors.teal + "18", border: `1.5px solid ${colors.teal}40`, color: colors.teal, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✏️</button>
+                <button onClick={() => setConfirmDelete(a.id)} style={{ width: 34, height: 34, borderRadius: 10, background: "#EB575718", border: "1.5px solid #EB575740", color: "#EB5757", fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>🗑️</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const S = {
+  label: { fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.text, fontSize: 13, marginBottom: 6 },
+};
+
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [mode, setMode] = useState("client"); // client | admin_login | admin
+  const [mode, setMode] = useState("client"); // client | resources | admin_login | admin | admin_resources
   const [adminAuth, setAdminAuth] = useState(false);
+  const [clientName, setClientName] = useState("");
 
   const isConfigured = !SUPABASE_URL.includes("YOUR_PROJECT");
 
@@ -673,7 +966,6 @@ export default function App() {
       padding: "20px 0 60px",
       fontFamily: "'Nunito', sans-serif",
     }}>
-      {/* Google Fonts */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -681,7 +973,7 @@ export default function App() {
       `}</style>
 
       {/* Top nav */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 24, padding: "0 20px" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 24, padding: "0 16px", flexWrap: "wrap" }}>
         <button
           onClick={() => setMode("client")}
           style={{
@@ -689,30 +981,34 @@ export default function App() {
             background: mode === "client" ? colors.teal : colors.card,
             color: mode === "client" ? "#fff" : colors.muted,
             border: `2px solid ${mode === "client" ? colors.teal : colors.border}`,
+            boxShadow: mode === "client" ? `0 3px 12px ${colors.teal}40` : "none",
           }}
-        >
-          🐾 Mon Journal
-        </button>
+        >🐾 Mon Journal</button>
         <button
-          onClick={() => mode === "admin" ? setMode("client") : setMode("admin_login")}
+          onClick={() => setMode("resources")}
           style={{
             ...styles.navBtn,
-            background: mode === "admin" ? colors.dark : colors.card,
-            color: mode === "admin" ? "#fff" : colors.muted,
-            border: `2px solid ${mode === "admin" ? colors.dark : colors.border}`,
+            background: mode === "resources" ? colors.gold : colors.card,
+            color: mode === "resources" ? "#fff" : colors.muted,
+            border: `2px solid ${mode === "resources" ? colors.gold : colors.border}`,
+            boxShadow: mode === "resources" ? `0 3px 12px ${colors.gold}40` : "none",
           }}
-        >
-          🔒 Admin
-        </button>
+        >📚 Ressources</button>
+        <button
+          onClick={() => (mode === "admin" || mode === "admin_resources") ? setMode("client") : setMode("admin_login")}
+          style={{
+            ...styles.navBtn,
+            background: (mode === "admin" || mode === "admin_resources") ? colors.dark : colors.card,
+            color: (mode === "admin" || mode === "admin_resources") ? "#fff" : colors.muted,
+            border: `2px solid ${(mode === "admin" || mode === "admin_resources") ? colors.dark : colors.border}`,
+          }}
+        >🔒 Admin</button>
       </div>
 
       {/* Config warning */}
       {!isConfigured && (
         <div style={{ maxWidth: 480, margin: "0 auto 20px", padding: "0 20px" }}>
-          <div style={{
-            background: "#FFF3CD", border: "2px solid #F2C94C",
-            borderRadius: 14, padding: 16,
-          }}>
+          <div style={{ background: "#FFF3CD", border: "2px solid #F2C94C", borderRadius: 14, padding: 16 }}>
             <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: "#856404", fontSize: 14 }}>
               ⚠️ Configuration requise — Voir le guide de déploiement pour connecter Supabase.
             </p>
@@ -721,12 +1017,16 @@ export default function App() {
       )}
 
       {/* Views */}
-      {mode === "client" && <ClientView />}
+      {mode === "client" && <ClientView onIdentified={setClientName} />}
+      {mode === "resources" && <ResourcesView clientName={clientName} />}
       {mode === "admin_login" && !adminAuth && (
         <AdminLogin onLogin={() => { setAdminAuth(true); setMode("admin"); }} />
       )}
       {mode === "admin" && adminAuth && (
-        <AdminView onLogout={() => { setAdminAuth(false); setMode("client"); }} />
+        <AdminView onLogout={() => { setAdminAuth(false); setMode("client"); }} onManageResources={() => setMode("admin_resources")} />
+      )}
+      {mode === "admin_resources" && adminAuth && (
+        <AdminResourcesView onBack={() => setMode("admin")} />
       )}
     </div>
   );
