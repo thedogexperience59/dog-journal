@@ -58,6 +58,16 @@ function Logo({ size = 80 }) {
   return (
     <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
       <img
+        src="https://i.imgur.com/XXXXX.png"
+        alt="The Dog Experience"
+        style={{ width: size, height: size, objectFit: "contain" }}
+      />
+    </div>
+  );
+}
+  return (
+    <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+      <img
         src={}
         alt="The Dog Experience"
         style={{ width: size, height: size, objectFit: "contain" }}
