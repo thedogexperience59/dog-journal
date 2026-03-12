@@ -1,0 +1,5 @@
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "frame-src 'self' https://www.youtube.com https://youtube.com;"
+    X-Frame-Options = "SAMEORIGIN"
