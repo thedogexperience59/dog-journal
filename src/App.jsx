@@ -425,9 +425,14 @@ function ClientView() {
         <Logo />
         <h2 style={styles.h2}>Bienvenue ! 🐾</h2>
         <p style={{ ...styles.subtitle, marginBottom: 8 }}>Première connexion pour <strong>{dogName}</strong></p>
-        <div style={{ background: colors.teal + "12", borderRadius: 14, padding: "12px 16px", marginBottom: 20, border: `1px solid ${colors.teal}30` }}>
+        <div style={{ background: colors.teal + "12", borderRadius: 14, padding: "12px 16px", marginBottom: 12, border: `1px solid ${colors.teal}30` }}>
           <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: colors.teal, fontWeight: 600, margin: 0 }}>
             🔒 Choisissez un mot de passe pour protéger votre journal. Vous en aurez besoin à chaque connexion.
+          </p>
+        </div>
+        <div style={{ background: colors.bg, borderRadius: 14, padding: "12px 16px", marginBottom: 20, border: `1.5px solid ${colors.border}` }}>
+          <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.muted, margin: 0, lineHeight: 1.6 }}>
+            📋 <strong style={{ color: colors.text }}>Confidentialité</strong> — Les données saisies dans ce journal (état émotionnel, compteurs, notes) sont partagées avec votre comportementaliste dans le cadre de votre suivi. Elles sont strictement confidentielles et ne sont pas transmises à des tiers.
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
