@@ -709,7 +709,7 @@ function ResourcesView({ clientName }) {
         </button>
         {selected.image_url && (
           <img src={selected.image_url} alt={selected.title}
-            style={{ width: "100%", borderRadius: 16, marginBottom: 18, maxHeight: 220, objectFit: "cover" }} />
+           style={{ width: "100%", borderRadius: 16, marginBottom: 18, objectFit: "contain", background: colors.bg }} />
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           {selected.category && (
@@ -784,7 +784,7 @@ function ResourcesView({ clientName }) {
             }}>
               {article.image_url && (
                 <img src={article.image_url} alt={article.title}
-                  style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }} />
+                  style={{ width: "100%", objectFit: "contain", display: "block", background: colors.bg }}
               )}
               <div style={{ padding: "14px 16px" }}>
                 {article.category && (
