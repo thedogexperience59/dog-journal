@@ -276,9 +276,11 @@ function getCurveSummary(entries, dogName) {
 // ─── CLIENT FORM ─────────────────────────────────────────────────────────────
 function ClientView() {
   const [step, setStep] = useState("identify"); // identify | journal | chart
-  const saved = (() => { try { const r = localStorage.getItem("tde_client"); return r ? JSON.parse(r) : null; } catch(e) { return null; } })();
+  const getSaved = () => { try { const r = localStorage.getItem("tde_client"); return r ? JSON.parse(r) : null; } catch(e) { return null; } };
+  const saved = getSaved();
   const [humanName, setHumanName] = useState(saved?.humanName || "");
   const [dogName, setDogName] = useState(saved?.dogName || "");
+  const [savedProfile, setSavedProfile] = useState(!!(saved?.humanName && saved?.dogName));
   const [noWalk, setNoWalk] = useState(false);
   const [emotionHome, setEmotionHome] = useState("");
   const [emotionOutside, setEmotionOutside] = useState("");
@@ -305,7 +307,7 @@ function ClientView() {
         `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=date.asc`
       );
       setMyEntries(data);
-      try { localStorage.setItem("tde_client", JSON.stringify({ humanName: humanName.trim(), dogName: dogName.trim() })); } catch(e) {}
+      try { localStorage.setItem("tde_client", JSON.stringify({ humanName: humanName.trim(), dogName: dogName.trim() })); setSavedProfile(true); } catch(e) {}
       setStep("journal");
     } catch (e) {
       setError("Erreur de connexion. Vérifiez votre connexion internet.");
@@ -353,7 +355,7 @@ function ClientView() {
         <Logo />
         <h1 style={styles.h1}>Mon Journal de Bord</h1>
         <p style={styles.subtitle}>Suivi quotidien · The Dog Experience</p>
-        {humanName && dogName ? (
+        {savedProfile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 24 }}>
             <div style={{ background: colors.teal + "12", border: `2px solid ${colors.teal}30`, borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
@@ -366,7 +368,7 @@ function ClientView() {
             <button style={styles.btnPrimary} onClick={handleIdentify} disabled={loading}>
               {loading ? "Chargement..." : "C'est parti ! →"}
             </button>
-            <button style={{ ...styles.btnSecondary, fontSize: 13 }} onClick={() => { setHumanName(""); setDogName(""); try { localStorage.removeItem("tde_client"); } catch(e) {} }}>
+            <button style={{ ...styles.btnSecondary, fontSize: 13 }} onClick={() => { setHumanName(""); setDogName(""); setSavedProfile(false); try { localStorage.removeItem("tde_client"); } catch(e) {} }}>
               Ce n'est pas moi
             </button>
           </div>
