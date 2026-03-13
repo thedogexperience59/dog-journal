@@ -173,7 +173,7 @@ function ProgressChart({ entries, title = "Progression sur 90 jours" }) {
       "État (extérieur)": e.no_walk ? null : (EMOTION_SCORE[e.emotion_outside] || null),
       "Déclenchements": e.triggers,
       "Aboiements": e.barks,
-      "Stimuli": e.stimuli,
+      "Éléments déclench.": e.stimuli,
     }));
 
   if (data.length === 0) {
@@ -200,7 +200,7 @@ function ProgressChart({ entries, title = "Progression sur 90 jours" }) {
           <Line type="monotone" dataKey="État (extérieur)" stroke={colors.gold} strokeWidth={2} dot={false} connectNulls />
           <Line type="monotone" dataKey="Déclenchements" stroke="#EB5757" strokeWidth={1.5} dot={false} />
           <Line type="monotone" dataKey="Aboiements" stroke="#9B59B6" strokeWidth={1.5} dot={false} />
-          <Line type="monotone" dataKey="Stimuli" stroke="#3498DB" strokeWidth={1.5} dot={false} />
+          <Line type="monotone" dataKey="Éléments déclench." stroke="#3498DB" strokeWidth={1.5} dot={false} />
         </LineChart>
       </ResponsiveContainer>
       <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 11, color: colors.muted, marginTop: 8 }}>
@@ -210,11 +210,75 @@ function ProgressChart({ entries, title = "Progression sur 90 jours" }) {
   );
 }
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function getEncouragement(entries) {
+  if (entries.length < 3) return null;
+  const SCORE = { serein: 1, peu_tendu: 2, stresse: 3, anxieux: 4 };
+  const recent = entries.slice(-7);
+  const older = entries.slice(-14, -7);
+  const avgRecent = recent.reduce((s, e) => s + (SCORE[e.emotion_home] || 2), 0) / recent.length;
+  const avgOlder = older.length > 0 ? older.reduce((s, e) => s + (SCORE[e.emotion_home] || 2), 0) / older.length : avgRecent;
+  const avgStimuli = recent.reduce((s, e) => s + (e.stimuli || 0), 0) / recent.length;
+  const avgTriggers = recent.reduce((s, e) => s + (e.triggers || 0), 0) / recent.length;
+  const trend = avgOlder - avgRecent;
+
+  // Forte amélioration
+  if (trend > 0.4) return { emoji: "🌟", msg: "Quelle belle semaine ! L'état émotionnel de votre chien s'améliore nettement. Votre engagement quotidien porte ses fruits — continuez, vous êtes sur la bonne voie !", color: colors.teal };
+  // Légère amélioration
+  if (trend > 0.1) return { emoji: "📈", msg: "La tendance est positive cette semaine. Chaque petit progrès compte et s'accumule. La régularité de votre suivi est votre plus grand atout !", color: colors.teal };
+  // Semaine difficile mais peu d'éléments déclencheurs
+  if (trend < -0.3 && avgStimuli < 2) return { emoji: "💛", msg: "La semaine a été un peu difficile, mais vous avez rencontré peu d'éléments déclencheurs. Votre chien gère mieux qu'il n'y paraît — la fatigue ou le contexte peuvent expliquer ces fluctuations.", color: colors.gold };
+  // Semaine difficile avec beaucoup d'éléments déclencheurs
+  if (trend < -0.3 && avgStimuli >= 2) return { emoji: "💪", msg: "Semaine chargée en éléments déclencheurs ! C'est normal que votre chien soit plus réactif dans ces conditions. Notez-le dans vos observations — ces informations sont précieuses pour adapter le travail.", color: colors.gold };
+  // Stable avec peu de déclenchements
+  if (avgTriggers < 1 && avgStimuli > 1) return { emoji: "✨", msg: "Très peu de déclenchements malgré les éléments rencontrés — c'est exactement ce qu'on cherche ! Votre chien apprend à gérer son environnement.", color: colors.teal };
+  // Stable
+  if (trend >= -0.1 && trend <= 0.1) return { emoji: "🐾", msg: "Belle stabilité cette semaine. La constance dans le suivi est la base de tout apprentissage durable. Merci pour votre implication !", color: colors.teal };
+  // Par défaut
+  return { emoji: "🐾", msg: "Merci pour ce suivi régulier. Chaque entrée dans ce journal est une brique supplémentaire dans la construction du bien-être de votre chien.", color: colors.teal };
+}
+
+function getCurveSummary(entries, dogName) {
+  if (entries.length < 2) return null;
+  const SCORE = { serein: 1, peu_tendu: 2, stresse: 3, anxieux: 4 };
+  const LABEL = { 1: "serein", 2: "un peu tendu", 3: "stressé", 4: "anxieux" };
+  const last7 = entries.slice(-7);
+  const last30 = entries.slice(-30);
+  const avgHome7 = last7.reduce((s, e) => s + (SCORE[e.emotion_home] || 2), 0) / last7.length;
+  const avgHome30 = last30.reduce((s, e) => s + (SCORE[e.emotion_home] || 2), 0) / last30.length;
+  const totalTriggers = last7.reduce((s, e) => s + (e.triggers || 0), 0);
+  const totalBarks = last7.reduce((s, e) => s + (e.barks || 0), 0);
+  const totalStimuli = last7.reduce((s, e) => s + (e.stimuli || 0), 0);
+  const trend = avgHome30 - avgHome7;
+  const trendText = trend > 0.3 ? "en amélioration 📈" : trend < -0.3 ? "en baisse 📉" : "stable ➡️";
+
+  // Analyse intelligente stimuli vs déclenchements
+  let stimuliAnalysis = "";
+  if (totalStimuli > 0 && totalTriggers > 0) {
+    const ratio = totalTriggers / totalStimuli;
+    if (ratio < 0.3) stimuliAnalysis = `Malgré **${totalStimuli} élément${totalStimuli > 1 ? "s" : ""} déclencheur${totalStimuli > 1 ? "s" : ""}** rencontré${totalStimuli > 1 ? "s" : ""} cette semaine, ${dogName} n'a réagi que **${totalTriggers} fois**. C'est un très bon signe de progression !`;
+    else if (ratio < 0.6) stimuliAnalysis = `Sur **${totalStimuli} élément${totalStimuli > 1 ? "s" : ""} déclencheur${totalStimuli > 1 ? "s" : ""}** croisé${totalStimuli > 1 ? "s" : ""}, ${dogName} a réagi **${totalTriggers} fois**. Les hausses de la courbe correspondent aux journées les plus chargées.`;
+    else stimuliAnalysis = `Cette semaine était dense : **${totalStimuli} élément${totalStimuli > 1 ? "s" : ""} déclencheur${totalStimuli > 1 ? "s" : ""}** pour **${totalTriggers} réaction${totalTriggers > 1 ? "s" : ""}**. Les pics de la courbe reflètent directement ces environnements chargés.`;
+  } else if (totalStimuli > 0 && totalTriggers === 0) {
+    stimuliAnalysis = `**${totalStimuli} élément${totalStimuli > 1 ? "s" : ""} déclencheur${totalStimuli > 1 ? "s" : ""}** croisé${totalStimuli > 1 ? "s" : ""} cette semaine, et **aucune réaction** ! C'est une excellente démonstration de la progression de ${dogName}.`;
+  } else if (totalStimuli === 0 && totalTriggers === 0) {
+    stimuliAnalysis = `Semaine très calme, sans élément déclencheur ni réaction. Idéal pour consolider les acquis.`;
+  }
+
+  return {
+    intro: `Sur les 7 derniers jours, **${dogName}** était en moyenne **${LABEL[Math.round(avgHome7)] || "stable"}** à la maison. Sa tendance générale est **${trendText}** par rapport au mois dernier.`,
+    stimuliAnalysis,
+    barks: totalBarks > 0 ? `**${totalBarks} aboiement${totalBarks > 1 ? "s" : ""}** enregistré${totalBarks > 1 ? "s" : ""} cette semaine.` : `Très peu ou pas d'aboiements cette semaine 🎉`,
+    legend: "📊 Sur le graphique : les courbes vertes et jaunes montrent l'état émotionnel (1 = Serein → 4 = Anxieux). La courbe bleue des éléments déclencheurs est la clé de lecture : quand elle monte, elle explique souvent les hausses émotionnelles. Quand les courbes émotionnelles baissent malgré une courbe bleue haute, c'est la preuve que votre chien progresse vraiment !",
+  };
+}
+
 // ─── CLIENT FORM ─────────────────────────────────────────────────────────────
 function ClientView() {
   const [step, setStep] = useState("identify"); // identify | journal | chart
-  const [humanName, setHumanName] = useState("");
-  const [dogName, setDogName] = useState("");
+  const saved = (() => { try { const r = localStorage.getItem("tde_client"); return r ? JSON.parse(r) : null; } catch(e) { return null; } })();
+  const [humanName, setHumanName] = useState(saved?.humanName || "");
+  const [dogName, setDogName] = useState(saved?.dogName || "");
   const [noWalk, setNoWalk] = useState(false);
   const [emotionHome, setEmotionHome] = useState("");
   const [emotionOutside, setEmotionOutside] = useState("");
@@ -241,6 +305,7 @@ function ClientView() {
         `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=date.asc`
       );
       setMyEntries(data);
+      try { localStorage.setItem("tde_client", JSON.stringify({ humanName: humanName.trim(), dogName: dogName.trim() })); } catch(e) {}
       setStep("journal");
     } catch (e) {
       setError("Erreur de connexion. Vérifiez votre connexion internet.");
@@ -288,45 +353,97 @@ function ClientView() {
         <Logo />
         <h1 style={styles.h1}>Mon Journal de Bord</h1>
         <p style={styles.subtitle}>Suivi quotidien · The Dog Experience</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 24 }}>
-          <input
-            style={styles.input}
-            placeholder="Votre prénom 👤"
-            value={humanName}
-            onChange={e => setHumanName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleIdentify()}
-          />
-          <input
-            style={styles.input}
-            placeholder="Nom de votre chien 🐕"
-            value={dogName}
-            onChange={e => setDogName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleIdentify()}
-          />
-          {error && <p style={styles.error}>{error}</p>}
-          <button style={styles.btnPrimary} onClick={handleIdentify} disabled={loading}>
-            {loading ? "Chargement..." : "Commencer →"}
-          </button>
-        </div>
+        {humanName && dogName ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 24 }}>
+            <div style={{ background: colors.teal + "12", border: `2px solid ${colors.teal}30`, borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 16, color: colors.dark, margin: 0 }}>👋 Bonjour, {humanName} !</p>
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: colors.muted, margin: "2px 0 0" }}>🐾 {dogName}</p>
+              </div>
+              <span style={{ fontSize: 28 }}>😊</span>
+            </div>
+            {error && <p style={styles.error}>{error}</p>}
+            <button style={styles.btnPrimary} onClick={handleIdentify} disabled={loading}>
+              {loading ? "Chargement..." : "C'est parti ! →"}
+            </button>
+            <button style={{ ...styles.btnSecondary, fontSize: 13 }} onClick={() => { setHumanName(""); setDogName(""); try { localStorage.removeItem("tde_client"); } catch(e) {} }}>
+              Ce n'est pas moi
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 24 }}>
+            <input
+              style={styles.input}
+              placeholder="Votre prénom 👤"
+              value={humanName}
+              onChange={e => setHumanName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleIdentify()}
+            />
+            <input
+              style={styles.input}
+              placeholder="Nom de votre chien 🐕"
+              value={dogName}
+              onChange={e => setDogName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleIdentify()}
+            />
+            {error && <p style={styles.error}>{error}</p>}
+            <button style={styles.btnPrimary} onClick={handleIdentify} disabled={loading}>
+              {loading ? "Chargement..." : "Commencer →"}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
 
   if (step === "chart") {
+    const encouragement = getEncouragement(myEntries);
+    const summary = getCurveSummary(myEntries, dogName);
     return (
       <div style={styles.card}>
         <Logo size={56} />
-        {success && (
-          <div style={{ background: colors.teal + "22", border: `2px solid ${colors.teal}`, borderRadius: 14, padding: 16, textAlign: "center", marginBottom: 20 }}>
-            <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.teal, fontSize: 16 }}>
-              ✅ Entrée enregistrée avec succès !
+        {success && encouragement && (
+          <div style={{ background: encouragement.color + "18", border: `2px solid ${encouragement.color}40`, borderRadius: 16, padding: 18, textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontSize: 32, marginBottom: 6 }}>{encouragement.emoji}</div>
+            <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: encouragement.color, fontSize: 14, lineHeight: 1.5 }}>
+              {encouragement.msg}
             </p>
           </div>
         )}
-        <h2 style={{ ...styles.h2, marginBottom: 16 }}>Bonjour, {humanName} 👋</h2>
-        <p style={{ ...styles.subtitle, marginBottom: 20 }}>Progression de {dogName}</p>
-        <ProgressChart entries={myEntries} title={`Progression de ${dogName} · 90 jours`} />
-        <button style={{ ...styles.btnSecondary, marginTop: 20 }} onClick={() => { setStep("journal"); setSuccess(false); }}>
+        {success && !encouragement && (
+          <div style={{ background: colors.teal + "18", border: `2px solid ${colors.teal}40`, borderRadius: 14, padding: 16, textAlign: "center", marginBottom: 20 }}>
+            <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.teal, fontSize: 15 }}>
+              ✅ Entrée enregistrée !
+            </p>
+          </div>
+        )}
+        <h2 style={{ ...styles.h2, marginBottom: 4 }}>Progression de {dogName} 📊</h2>
+        <p style={{ ...styles.subtitle, marginBottom: 20 }}>{myEntries.length} jours de suivi</p>
+
+        <ProgressChart entries={myEntries} title={`Courbe de ${dogName} · 90 jours`} />
+
+        {summary && (
+          <div style={{ background: colors.bg, borderRadius: 16, padding: "16px 18px", marginTop: 16, border: `1.5px solid ${colors.border}` }}>
+            <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14, color: colors.dark, marginBottom: 12 }}>
+              💡 Comment lire cette courbe ?
+            </p>
+            {[summary.intro, summary.stimuliAnalysis, summary.barks].filter(Boolean).map((line, i) => {
+              const parts = line.split(/\*\*(.*?)\*\*/g);
+              return (
+                <p key={i} style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: colors.text, marginBottom: 8, lineHeight: 1.65 }}>
+                  {parts.map((p, j) => j % 2 === 1 ? <strong key={j} style={{ color: colors.dark }}>{p}</strong> : p)}
+                </p>
+              );
+            })}
+            <div style={{ background: colors.teal + "10", borderRadius: 10, padding: "10px 12px", marginTop: 10, border: `1px solid ${colors.teal}20` }}>
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.text, lineHeight: 1.65, margin: 0 }}>
+                {summary.legend.split(/\*\*(.*?)\*\*/g).map((p, j) => j % 2 === 1 ? <strong key={j} style={{ color: colors.teal }}>{p}</strong> : p)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <button style={{ ...styles.btnSecondary, marginTop: 16 }} onClick={() => { setStep("journal"); setSuccess(false); }}>
           ← Nouvelle saisie
         </button>
       </div>
@@ -373,7 +490,7 @@ function ClientView() {
           <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.text, fontSize: 15, margin: 0 }}>
             🔢 Compteurs
           </p>
-          <Counter label="👀 Stimuli croisés" value={stimuli} onChange={setStimuli} />
+          <Counter label="👀 Éléments déclencheurs" value={stimuli} onChange={setStimuli} />
           <Counter label="⚡ Déclenchements" value={triggers} onChange={setTriggers} />
           <Counter label="🗣️ Aboiements" value={barks} onChange={setBarks} />
         </div>
