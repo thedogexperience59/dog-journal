@@ -294,6 +294,7 @@ function ClientView() {
   const [success, setSuccess] = useState(false);
 
   const today = new Date().toISOString().slice(0, 10);
+  const [selectedDate, setSelectedDate] = useState(today);
 
   const handleIdentify = async () => {
     if (!humanName.trim() || !dogName.trim()) {
@@ -321,10 +322,15 @@ function ClientView() {
     setError("");
     setLoading(true);
     try {
+      // Delete existing entry for that date if any (avoid duplicates)
+      await supaFetch(
+        `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&date=eq.${selectedDate}`,
+        { method: "DELETE", prefer: "return=minimal" }
+      );
       const payload = {
         human_name: humanName.trim(),
         dog_name: dogName.trim(),
-        date: today,
+        date: selectedDate,
         emotion_home: emotionHome,
         emotion_outside: noWalk ? null : emotionOutside,
         no_walk: noWalk,
@@ -347,7 +353,17 @@ function ClientView() {
     setLoading(false);
   };
 
+  const selectedEntry = myEntries.find(e => e.date === selectedDate);
   const todayEntry = myEntries.find(e => e.date === today);
+
+  // Build list of last 7 days for date picker
+  const dateOptions = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const val = d.toISOString().slice(0, 10);
+    const label = i === 0 ? "Aujourd'hui" : i === 1 ? "Hier" : d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+    const hasEntry = myEntries.some(e => e.date === val);
+    return { val, label, hasEntry };
+  });
 
   if (step === "identify") {
     return (
@@ -457,14 +473,39 @@ function ClientView() {
     <div style={styles.card}>
       <Logo size={56} />
       <h2 style={styles.h2}>Bonjour, {humanName} ! 🐾</h2>
-      <p style={styles.subtitle}>
-        Journal de <strong>{dogName}</strong> · {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
-      </p>
+      <p style={{ ...styles.subtitle, marginBottom: 16 }}>Journal de <strong>{dogName}</strong></p>
 
-      {todayEntry && (
+      {/* Date picker - aujourd'hui, hier, avant-hier */}
+      <div style={{ marginBottom: 18 }}>
+        <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.text, fontSize: 14, marginBottom: 8 }}>
+          📅 Pour quel jour ?
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          {dateOptions.map(opt => (
+            <button key={opt.val} onClick={() => setSelectedDate(opt.val)} style={{
+              padding: "12px 16px", borderRadius: 13, cursor: "pointer", textAlign: "left",
+              border: `2px solid ${selectedDate === opt.val ? colors.teal : colors.border}`,
+              background: selectedDate === opt.val ? colors.teal + "12" : colors.bg,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              fontFamily: "'Nunito', sans-serif",
+            }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: selectedDate === opt.val ? colors.teal : colors.text }}>
+                {opt.label}
+              </span>
+              {opt.hasEntry && (
+                <span style={{ background: colors.gold + "30", color: "#9A6E00", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>
+                  déjà saisi ✏️
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selectedEntry && (
         <div style={{ background: colors.gold + "22", border: `2px solid ${colors.gold}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
           <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: "#B8860B", fontSize: 14, margin: 0 }}>
-            ⚠️ Vous avez déjà saisi une entrée aujourd'hui. Elle sera remplacée.
+            ✏️ Une entrée existe déjà pour ce jour. Elle sera remplacée par la nouvelle saisie.
           </p>
         </div>
       )}
