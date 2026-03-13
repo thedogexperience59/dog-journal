@@ -275,12 +275,15 @@ function getCurveSummary(entries, dogName) {
 
 // ─── CLIENT FORM ─────────────────────────────────────────────────────────────
 function ClientView() {
-  const [step, setStep] = useState("identify"); // identify | journal | chart
+  const [step, setStep] = useState("identify"); // identify | setpassword | journal | chart
   const getSaved = () => { try { const r = localStorage.getItem("tde_client"); return r ? JSON.parse(r) : null; } catch(e) { return null; } };
   const saved = getSaved();
   const [humanName, setHumanName] = useState(saved?.humanName || "");
   const [dogName, setDogName] = useState(saved?.dogName || "");
   const [savedProfile, setSavedProfile] = useState(!!(saved?.humanName && saved?.dogName));
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPassword2, setNewPassword2] = useState("");
   const [noWalk, setNoWalk] = useState(false);
   const [emotionHome, setEmotionHome] = useState("");
   const [emotionOutside, setEmotionOutside] = useState("");
@@ -290,6 +293,7 @@ function ClientView() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [myEntries, setMyEntries] = useState([]);
+  const [clientProfile, setClientProfile] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
@@ -301,9 +305,30 @@ function ClientView() {
       setError("Merci de renseigner votre prénom et le nom de votre chien.");
       return;
     }
+    if (!password.trim()) {
+      setError("Merci de saisir votre mot de passe.");
+      return;
+    }
     setError("");
     setLoading(true);
     try {
+      // Check if client profile exists
+      const profiles = await supaFetch(
+        `/client_profiles?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}`
+      );
+      if (profiles.length === 0) {
+        // New client — go to set password step
+        setStep("setpassword");
+        setLoading(false);
+        return;
+      }
+      const profile = profiles[0];
+      if (profile.password !== password.trim()) {
+        setError("Mot de passe incorrect.");
+        setLoading(false);
+        return;
+      }
+      setClientProfile(profile);
       const data = await supaFetch(
         `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=date.asc`
       );
@@ -312,6 +337,35 @@ function ClientView() {
       setStep("journal");
     } catch (e) {
       setError("Erreur de connexion. Vérifiez votre connexion internet.");
+    }
+    setLoading(false);
+  };
+
+  const handleSetPassword = async () => {
+    if (!newPassword.trim() || newPassword.length < 4) {
+      setError("Le mot de passe doit faire au moins 4 caractères.");
+      return;
+    }
+    if (newPassword !== newPassword2) {
+      setError("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      await supaFetch("/client_profiles", {
+        method: "POST",
+        prefer: "return=minimal",
+        body: JSON.stringify({ human_name: humanName.trim(), dog_name: dogName.trim(), password: newPassword.trim() }),
+      });
+      const data = await supaFetch(
+        `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=date.asc`
+      );
+      setMyEntries(data);
+      try { localStorage.setItem("tde_client", JSON.stringify({ humanName: humanName.trim(), dogName: dogName.trim() })); setSavedProfile(true); } catch(e) {}
+      setStep("journal");
+    } catch (e) {
+      setError("Erreur lors de la création du compte : " + e.message);
     }
     setLoading(false);
   };
@@ -365,6 +419,35 @@ function ClientView() {
     return { val, label, hasEntry };
   });
 
+  if (step === "setpassword") {
+    return (
+      <div style={styles.card}>
+        <Logo />
+        <h2 style={styles.h2}>Bienvenue ! 🐾</h2>
+        <p style={{ ...styles.subtitle, marginBottom: 8 }}>Première connexion pour <strong>{dogName}</strong></p>
+        <div style={{ background: colors.teal + "12", borderRadius: 14, padding: "12px 16px", marginBottom: 20, border: `1px solid ${colors.teal}30` }}>
+          <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: colors.teal, fontWeight: 600, margin: 0 }}>
+            🔒 Choisissez un mot de passe pour protéger votre journal. Vous en aurez besoin à chaque connexion.
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <input style={styles.input} type="password" placeholder="Choisir un mot de passe (min. 4 caractères)"
+            value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+          <input style={styles.input} type="password" placeholder="Confirmer le mot de passe"
+            value={newPassword2} onChange={e => setNewPassword2(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSetPassword()} />
+          {error && <p style={styles.error}>{error}</p>}
+          <button style={styles.btnPrimary} onClick={handleSetPassword} disabled={loading}>
+            {loading ? "Création..." : "Créer mon compte →"}
+          </button>
+          <button style={{ ...styles.btnSecondary, fontSize: 13 }} onClick={() => { setStep("identify"); setError(""); }}>
+            ← Retour
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (step === "identify") {
     return (
       <div style={styles.card}>
@@ -380,11 +463,19 @@ function ClientView() {
               </div>
               <span style={{ fontSize: 28 }}>😊</span>
             </div>
+            <input
+              style={styles.input}
+              type="password"
+              placeholder="Mot de passe 🔒"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleIdentify()}
+            />
             {error && <p style={styles.error}>{error}</p>}
             <button style={styles.btnPrimary} onClick={handleIdentify} disabled={loading}>
               {loading ? "Chargement..." : "C'est parti ! →"}
             </button>
-            <button style={{ ...styles.btnSecondary, fontSize: 13 }} onClick={() => { setHumanName(""); setDogName(""); setSavedProfile(false); try { localStorage.removeItem("tde_client"); } catch(e) {} }}>
+            <button style={{ ...styles.btnSecondary, fontSize: 13 }} onClick={() => { setHumanName(""); setDogName(""); setPassword(""); setSavedProfile(false); try { localStorage.removeItem("tde_client"); } catch(e) {} }}>
               Ce n'est pas moi
             </button>
           </div>
@@ -395,13 +486,19 @@ function ClientView() {
               placeholder="Votre prénom 👤"
               value={humanName}
               onChange={e => setHumanName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleIdentify()}
             />
             <input
               style={styles.input}
               placeholder="Nom de votre chien 🐕"
               value={dogName}
               onChange={e => setDogName(e.target.value)}
+            />
+            <input
+              style={styles.input}
+              type="password"
+              placeholder="Mot de passe 🔒"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleIdentify()}
             />
             {error && <p style={styles.error}>{error}</p>}
@@ -731,15 +828,23 @@ function AdminView({ onLogout, onManageResources }) {
             <button onClick={() => setSelected(null)} style={{ ...styles.btnSecondary, width: "auto", padding: "10px 18px" }}>
               ← Retour
             </button>
-            <button
-              onClick={() => setConfirmDelete({ human: selected.human, dog: selected.dog })}
-              style={{
-                padding: "10px 16px", borderRadius: 12,
-                background: "#EB575718", border: "1.5px solid #EB575740",
-                color: "#EB5757", fontFamily: "'Nunito', sans-serif",
-                fontWeight: 700, fontSize: 13, cursor: "pointer",
-              }}
-            >🗑️ Supprimer ce client</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={async () => {
+                  if (window.confirm(`Réinitialiser le mot de passe de ${selected.dog} ?`)) {
+                    try {
+                      await supaFetch(`/client_profiles?human_name=ilike.${encodeURIComponent(selected.human)}&dog_name=ilike.${encodeURIComponent(selected.dog)}`, { method: "DELETE", prefer: "return=minimal" });
+                      alert("Mot de passe supprimé. Le client devra en créer un nouveau à sa prochaine connexion.");
+                    } catch(e) { alert("Erreur : " + e.message); }
+                  }
+                }}
+                style={{ padding: "10px 14px", borderRadius: 12, background: colors.gold + "18", border: `1.5px solid ${colors.gold}50`, color: "#9A6E00", fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+              >🔑 Réinit. MDP</button>
+              <button
+                onClick={() => setConfirmDelete({ human: selected.human, dog: selected.dog })}
+                style={{ padding: "10px 14px", borderRadius: 12, background: "#EB575718", border: "1.5px solid #EB575740", color: "#EB5757", fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+              >🗑️ Supprimer</button>
+            </div>
           </div>
           <h3 style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, color: colors.dark, fontSize: 18, marginBottom: 4 }}>
             🐾 {selected.dog}
