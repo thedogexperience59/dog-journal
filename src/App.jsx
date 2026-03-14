@@ -28,7 +28,7 @@ async function supaFetch(path, options = {}) {
 }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const ADMIN_PASSWORD = "qci35rd7";
+const ADMIN_PASSWORD = process.env.REACT_APP_ADMIN_PASSWORD || "qci35rd7";
 
 const EMOTIONS = [
   { id: "serein", label: "Serein", emoji: "😌", color: "#2B9E8E" },
@@ -210,6 +210,15 @@ function ProgressChart({ entries, title = "Progression sur 90 jours" }) {
   );
 }
 
+// ─── CRYPTO ──────────────────────────────────────────────────────────────────
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password.trim().toLowerCase());
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function getEncouragement(entries) {
   if (entries.length < 3) return null;
@@ -323,7 +332,8 @@ function ClientView() {
         return;
       }
       const profile = profiles[0];
-      if (profile.password !== password.trim()) {
+      const hashedInput = await hashPassword(password);
+      if (profile.password !== hashedInput) {
         setError("Mot de passe incorrect.");
         setLoading(false);
         return;
@@ -353,10 +363,11 @@ function ClientView() {
     setError("");
     setLoading(true);
     try {
+      const hashedPassword = await hashPassword(newPassword);
       await supaFetch("/client_profiles", {
         method: "POST",
         prefer: "return=minimal",
-        body: JSON.stringify({ human_name: humanName.trim(), dog_name: dogName.trim(), password: newPassword.trim() }),
+        body: JSON.stringify({ human_name: humanName.trim(), dog_name: dogName.trim(), password: hashedPassword }),
       });
       const data = await supaFetch(
         `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=date.asc`
