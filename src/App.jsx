@@ -1075,6 +1075,92 @@ function AdminView({ onLogout, onManageResources }) {
               </div>
             ))}
           </div>
+          </>}
+
+          {/* TAB: Appointments */}
+          {adminTab === "appointments" && (
+            <div>
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 15, color: colors.dark, marginBottom: 14 }}>
+                📅 Rendez-vous à venir
+              </p>
+              <div style={{ background: colors.bg, borderRadius: 16, padding: 16, border: `1.5px solid ${colors.border}`, marginBottom: 16 }}>
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: colors.text, marginBottom: 10 }}>+ Ajouter un rendez-vous</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <input style={{ ...styles.input, fontSize: 13 }} type="date" value={newApt.date}
+                    onChange={e => setNewApt({ ...newApt, date: e.target.value })} />
+                  <input style={{ ...styles.input, fontSize: 13 }} placeholder="Heure (ex: 14h30)"
+                    value={newApt.time} onChange={e => setNewApt({ ...newApt, time: e.target.value })} />
+                  <input style={{ ...styles.input, fontSize: 13 }} placeholder="Lieu (optionnel)"
+                    value={newApt.location} onChange={e => setNewApt({ ...newApt, location: e.target.value })} />
+                  <button style={{ ...styles.btnPrimary, fontSize: 13, padding: "12px" }}
+                    onClick={addAppointment} disabled={savingApt || !newApt.date}>
+                    {savingApt ? "Enregistrement..." : "✅ Ajouter"}
+                  </button>
+                </div>
+              </div>
+              {appointments.length === 0 ? (
+                <p style={{ fontFamily: "'Nunito', sans-serif", color: colors.muted, textAlign: "center", padding: 20, fontSize: 13 }}>
+                  Aucun rendez-vous programmé.
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {appointments.map(apt => (
+                    <div key={apt.id} style={{ background: colors.bg, border: `1.5px solid ${colors.border}`, borderRadius: 13, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 14, color: colors.dark, margin: 0 }}>
+                          {new Date(apt.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                          {apt.time ? ` — ${apt.time}` : ""}
+                        </p>
+                        {apt.location && <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.muted, margin: "2px 0 0" }}>📍 {apt.location}</p>}
+                      </div>
+                      <button onClick={() => deleteAppointment(apt.id)} style={{
+                        width: 32, height: 32, borderRadius: 8, background: "#EB575718",
+                        border: "1px solid #EB575740", color: "#EB5757", cursor: "pointer", fontSize: 14,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>🗑️</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: Message */}
+          {adminTab === "message" && (
+            <div>
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 15, color: colors.dark, marginBottom: 14 }}>
+                💬 Envoyer un message à {selected.human}
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <textarea
+                  style={{ ...styles.input, minHeight: 100, resize: "vertical" }}
+                  placeholder="Votre message personnalisé..."
+                  value={newMsg.message}
+                  onChange={e => setNewMsg({ ...newMsg, message: e.target.value })}
+                />
+                <div>
+                  <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13, color: colors.text, marginBottom: 6 }}>
+                    📚 Suggérer une ressource (optionnel)
+                  </p>
+                  <select style={{ ...styles.input, fontSize: 13 }}
+                    value={newMsg.article_id}
+                    onChange={e => setNewMsg({ ...newMsg, article_id: e.target.value })}>
+                    <option value="">— Aucune ressource —</option>
+                    {allArticles.map(a => (
+                      <option key={a.id} value={a.id}>{a.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <button style={styles.btnPrimary} onClick={sendMessage} disabled={savingMsg || !newMsg.message.trim()}>
+                  {savingMsg ? "Envoi..." : "📨 Envoyer le message"}
+                </button>
+                <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 11, color: colors.muted, textAlign: "center" }}>
+                  Le client verra ce message en haut de son journal dès sa prochaine connexion.
+                </p>
+              </div>
+            </div>
+          )}
+
         </>
       )}
     </div>
