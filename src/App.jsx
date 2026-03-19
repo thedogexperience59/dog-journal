@@ -164,16 +164,29 @@ function EmotionPicker({ value, onChange, label }) {
 }
 
 // ─── PROGRESS CHART ──────────────────────────────────────────────────────────
+const CHART_LINES = [
+  { key: "État (maison)",      color: "#2B9E8E", label: "Maison",          strokeWidth: 2.5 },
+  { key: "État (extérieur)",   color: "#E8B84B", label: "Extérieur",       strokeWidth: 2.5 },
+  { key: "Éléments déclench.", color: "#3498DB", label: "Éléments décl.",  strokeWidth: 1.5 },
+  { key: "Déclenchements",     color: "#EB5757", label: "Déclenchements",  strokeWidth: 1.5 },
+  { key: "Aboiements",         color: "#9B59B6", label: "Aboiements",      strokeWidth: 1.5 },
+];
+
 function ProgressChart({ entries, title = "Progression sur 90 jours" }) {
+  const [visible, setVisible] = useState(
+    Object.fromEntries(CHART_LINES.map(l => [l.key, true]))
+  );
+  const toggle = (key) => setVisible(v => ({ ...v, [key]: !v[key] }));
+
   const data = entries
     .slice(-90)
     .map(e => ({
       date: new Date(e.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }),
       "État (maison)": EMOTION_SCORE[e.emotion_home] || null,
       "État (extérieur)": e.no_walk ? null : (EMOTION_SCORE[e.emotion_outside] || null),
+      "Éléments déclench.": e.stimuli,
       "Déclenchements": e.triggers,
       "Aboiements": e.barks,
-      "Éléments déclench.": e.stimuli,
     }));
 
   if (data.length === 0) {
@@ -186,25 +199,41 @@ function ProgressChart({ entries, title = "Progression sur 90 jours" }) {
 
   return (
     <div style={{ background: colors.card, borderRadius: 20, padding: 20, border: `1px solid ${colors.border}` }}>
-      <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.dark, marginBottom: 16, fontSize: 15 }}>
+      <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.dark, marginBottom: 12, fontSize: 15 }}>
         📈 {title}
       </p>
+
+      {/* Toggle buttons */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+        {CHART_LINES.map(line => (
+          <button key={line.key} onClick={() => toggle(line.key)} style={{
+            padding: "4px 11px", borderRadius: 20,
+            border: `2px solid ${line.color}`,
+            background: visible[line.key] ? line.color : "transparent",
+            color: visible[line.key] ? "#fff" : line.color,
+            fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 11,
+            cursor: "pointer", transition: "all 0.15s",
+          }}>
+            {visible[line.key] ? "✓ " : ""}{line.label}
+          </button>
+        ))}
+      </div>
+
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ left: -20, right: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />
           <XAxis dataKey="date" tick={{ fontSize: 10, fontFamily: "'Nunito', sans-serif" }} interval="preserveStartEnd" />
           <YAxis tick={{ fontSize: 10, fontFamily: "'Nunito', sans-serif" }} />
           <Tooltip contentStyle={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, borderRadius: 10 }} />
-          <Legend wrapperStyle={{ fontSize: 11, fontFamily: "'Nunito', sans-serif" }} />
-          <Line type="monotone" dataKey="État (maison)" stroke={colors.teal} strokeWidth={2} dot={false} connectNulls />
-          <Line type="monotone" dataKey="État (extérieur)" stroke={colors.gold} strokeWidth={2} dot={false} connectNulls />
-          <Line type="monotone" dataKey="Déclenchements" stroke="#EB5757" strokeWidth={1.5} dot={false} />
-          <Line type="monotone" dataKey="Aboiements" stroke="#9B59B6" strokeWidth={1.5} dot={false} />
-          <Line type="monotone" dataKey="Éléments déclench." stroke="#3498DB" strokeWidth={1.5} dot={false} />
+          {CHART_LINES.map(line => visible[line.key] ? (
+            <Line key={line.key} type="monotone" dataKey={line.key}
+              stroke={line.color} strokeWidth={line.strokeWidth}
+              dot={false} connectNulls />
+          ) : null)}
         </LineChart>
       </ResponsiveContainer>
       <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 11, color: colors.muted, marginTop: 8 }}>
-        États : 1 = Serein → 4 = Anxieux
+        États émotionnels : 1 = Serein → 4 = Anxieux · Appuyez sur une courbe pour l'afficher/masquer
       </p>
     </div>
   );
@@ -274,7 +303,42 @@ function getCurveSummary(entries, dogName) {
     stimuliAnalysis = `Semaine très calme, sans élément déclencheur ni réaction. Idéal pour consolider les acquis.`;
   }
 
+  // ── Human headline sentence ──
+  let headline = "";
+  let headlineEmoji = "🐾";
+
+  if (entries.length < 3) {
+    headline = `Continuez le suivi — les premières données de ${dogName} arrivent !`;
+    headlineEmoji = "📝";
+  } else if (trend > 0.5) {
+    headline = `Superbe semaine ! ${dogName} est nettement plus serein que le mois dernier.`;
+    headlineEmoji = "🌟";
+  } else if (trend > 0.2) {
+    headline = `Belle progression cette semaine. ${dogName} va dans le bon sens !`;
+    headlineEmoji = "📈";
+  } else if (totalStimuli > 0 && totalTriggers === 0) {
+    headline = `Incroyable — ${totalStimuli} élément${totalStimuli > 1 ? "s" : ""} déclencheur${totalStimuli > 1 ? "s" : ""} croisé${totalStimuli > 1 ? "s" : ""} et aucune réaction de ${dogName} cette semaine !`;
+    headlineEmoji = "🏆";
+  } else if (totalStimuli > 0 && totalTriggers / totalStimuli < 0.3) {
+    headline = `${dogName} a croisé ${totalStimuli} élément${totalStimuli > 1 ? "s" : ""} déclencheur${totalStimuli > 1 ? "s" : ""} et n'a réagi que ${totalTriggers} fois. C'est une vraie progression !`;
+    headlineEmoji = "✨";
+  } else if (trend < -0.4 && totalStimuli >= 3) {
+    headline = `Semaine chargée pour ${dogName} — beaucoup d'éléments déclencheurs. C'est normal que la courbe monte dans ces conditions.`;
+    headlineEmoji = "💛";
+  } else if (trend < -0.2) {
+    headline = `Semaine un peu difficile pour ${dogName}. Chaque journée notée est un pas en avant, même les moins bonnes.`;
+    headlineEmoji = "💪";
+  } else if (SCORE[entries[entries.length-1]?.emotion_home] <= 1.5) {
+    headline = `${dogName} est serein à la maison en ce moment. Profitez de cette stabilité !`;
+    headlineEmoji = "😌";
+  } else {
+    headline = `${dogName} suit son chemin. La régularité de votre suivi fait toute la différence.`;
+    headlineEmoji = "🐾";
+  }
+
   return {
+    headline,
+    headlineEmoji,
     intro: `Sur les 7 derniers jours, **${dogName}** était en moyenne **${LABEL[Math.round(avgHome7)] || "stable"}** à la maison. Sa tendance générale est **${trendText}** par rapport au mois dernier.`,
     stimuliAnalysis,
     barks: totalBarks > 0 ? `**${totalBarks} aboiement${totalBarks > 1 ? "s" : ""}** enregistré${totalBarks > 1 ? "s" : ""} cette semaine.` : `Très peu ou pas d'aboiements cette semaine 🎉`,
@@ -601,7 +665,23 @@ function ClientView() {
           </div>
         )}
         <h2 style={{ ...styles.h2, marginBottom: 4 }}>Progression de {dogName} 📊</h2>
-        <p style={{ ...styles.subtitle, marginBottom: 20 }}>{myEntries.length} jours de suivi</p>
+        <p style={{ ...styles.subtitle, marginBottom: 16 }}>{myEntries.length} jours de suivi</p>
+
+        {/* Human headline — most visible element */}
+        {summary && (
+          <div style={{
+            background: `linear-gradient(135deg, ${colors.teal}18, ${colors.gold}12)`,
+            border: `2px solid ${colors.teal}40`,
+            borderRadius: 18, padding: "18px 20px", marginBottom: 20,
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>{summary.headlineEmoji}</div>
+            <p style={{
+              fontFamily: "'Nunito', sans-serif", fontWeight: 800,
+              fontSize: 16, color: colors.dark, lineHeight: 1.5, margin: 0,
+            }}>{summary.headline}</p>
+          </div>
+        )}
 
         <ProgressChart entries={myEntries} title={`Courbe de ${dogName} · 90 jours`} />
 
