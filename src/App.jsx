@@ -790,9 +790,50 @@ function ClientView() {
       </div>
 
       {selectedEntry && (
-        <div style={{ background: colors.gold + "22", border: `2px solid ${colors.gold}`, borderRadius: 14, padding: 14, marginBottom: 16 }}>
-          <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: "#B8860B", fontSize: 14, margin: 0 }}>
-            ✏️ Une entrée existe déjà pour ce jour. Elle sera remplacée par la nouvelle saisie.
+        <div style={{ background: colors.teal + "10", border: `2px solid ${colors.teal}30`, borderRadius: 16, padding: 16, marginBottom: 16 }}>
+          <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13, color: colors.teal, marginBottom: 10 }}>
+            📋 Ce qui a déjà été saisi aujourd'hui
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {/* Emotions */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {selectedEntry.emotion_home && (
+                <span style={{ background: colors.card, border: `1px solid ${colors.border}`, borderRadius: 20, padding: "3px 10px", fontSize: 12, fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.text }}>
+                  🏠 Maison : {EMOTIONS.find(e => e.id === selectedEntry.emotion_home)?.emoji} {EMOTIONS.find(e => e.id === selectedEntry.emotion_home)?.label}
+                </span>
+              )}
+              {!selectedEntry.no_walk && selectedEntry.emotion_outside && (
+                <span style={{ background: colors.card, border: `1px solid ${colors.border}`, borderRadius: 20, padding: "3px 10px", fontSize: 12, fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.text }}>
+                  🌳 Extérieur : {EMOTIONS.find(e => e.id === selectedEntry.emotion_outside)?.emoji} {EMOTIONS.find(e => e.id === selectedEntry.emotion_outside)?.label}
+                </span>
+              )}
+              {selectedEntry.no_walk && (
+                <span style={{ background: colors.gold + "25", color: "#9A6E00", borderRadius: 20, padding: "3px 10px", fontSize: 12, fontFamily: "'Nunito', sans-serif", fontWeight: 700 }}>
+                  🏡 Mise au vert
+                </span>
+              )}
+            </div>
+            {/* Counters */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.text, background: colors.card, borderRadius: 20, padding: "3px 10px", border: `1px solid ${colors.border}` }}>
+                👀 Éléments : <strong>{selectedEntry.stimuli}</strong>
+              </span>
+              <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.text, background: colors.card, borderRadius: 20, padding: "3px 10px", border: `1px solid ${colors.border}` }}>
+                ⚡ Décl. : <strong>{selectedEntry.triggers}</strong>
+              </span>
+              <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.text, background: colors.card, borderRadius: 20, padding: "3px 10px", border: `1px solid ${colors.border}` }}>
+                🗣️ Aboiem. : <strong>{selectedEntry.barks}</strong>
+              </span>
+            </div>
+            {/* Notes */}
+            {selectedEntry.notes && (
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.text, background: colors.card, borderRadius: 10, padding: "7px 11px", margin: 0, fontStyle: "italic" }}>
+                "{selectedEntry.notes}"
+              </p>
+            )}
+          </div>
+          <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 11, color: colors.muted, margin: "10px 0 0" }}>
+            ➕ Votre saisie sera ajoutée à ce qui existe déjà.
           </p>
         </div>
       )}
