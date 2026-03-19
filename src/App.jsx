@@ -303,6 +303,8 @@ function ClientView() {
   const [loading, setLoading] = useState(false);
   const [myEntries, setMyEntries] = useState([]);
   const [clientProfile, setClientProfile] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
@@ -343,6 +345,22 @@ function ClientView() {
         `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=date.asc`
       );
       setMyEntries(data);
+      // Load appointments and messages
+      const appts = await supaFetch(
+        `/appointments?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&date=gte.${today}&order=date.asc`
+      );
+      setAppointments(appts);
+      const msgs = await supaFetch(
+        `/client_messages?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=created_at.desc`
+      );
+      setMessages(msgs);
+      // Mark messages as read
+      if (msgs.some(m => !m.read)) {
+        await supaFetch(
+          `/client_messages?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}`,
+          { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ read: true }) }
+        );
+      }
       try { localStorage.setItem("tde_client", JSON.stringify({ humanName: humanName.trim(), dogName: dogName.trim() })); setSavedProfile(true); } catch(e) {}
       setStep("journal");
     } catch (e) {
@@ -373,6 +391,22 @@ function ClientView() {
         `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=date.asc`
       );
       setMyEntries(data);
+      // Load appointments and messages
+      const appts = await supaFetch(
+        `/appointments?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&date=gte.${today}&order=date.asc`
+      );
+      setAppointments(appts);
+      const msgs = await supaFetch(
+        `/client_messages?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=created_at.desc`
+      );
+      setMessages(msgs);
+      // Mark messages as read
+      if (msgs.some(m => !m.read)) {
+        await supaFetch(
+          `/client_messages?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}`,
+          { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ read: true }) }
+        );
+      }
       try { localStorage.setItem("tde_client", JSON.stringify({ humanName: humanName.trim(), dogName: dogName.trim() })); setSavedProfile(true); } catch(e) {}
       setStep("journal");
     } catch (e) {
@@ -387,25 +421,43 @@ function ClientView() {
     setError("");
     setLoading(true);
     try {
-      // Delete existing entry for that date if any (avoid duplicates)
-      await supaFetch(
-        `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&date=eq.${selectedDate}`,
-        { method: "DELETE", prefer: "return=minimal" }
+      // Check for existing entry — merge counters instead of replacing
+      const existing = await supaFetch(
+        `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&date=eq.${selectedDate}`
       );
-      const payload = {
-        human_name: humanName.trim(),
-        dog_name: dogName.trim(),
-        date: selectedDate,
-        emotion_home: emotionHome,
-        emotion_outside: noWalk ? null : emotionOutside,
-        no_walk: noWalk,
-        stimuli, triggers, barks,
-        notes: notes.trim(),
-      };
-      await supaFetch("/journal_entries", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      if (existing.length > 0) {
+        // Merge: add counters, keep latest emotion, concatenate notes
+        const prev = existing[0];
+        const mergedNotes = [prev.notes, notes.trim()].filter(Boolean).join(" — ");
+        const payload = {
+          emotion_home: emotionHome || prev.emotion_home,
+          emotion_outside: noWalk ? null : (emotionOutside || prev.emotion_outside),
+          no_walk: noWalk,
+          stimuli: (prev.stimuli || 0) + stimuli,
+          triggers: (prev.triggers || 0) + triggers,
+          barks: (prev.barks || 0) + barks,
+          notes: mergedNotes,
+        };
+        await supaFetch(
+          `/journal_entries?id=eq.${existing[0].id}`,
+          { method: "PATCH", prefer: "return=minimal", body: JSON.stringify(payload) }
+        );
+      } else {
+        const payload = {
+          human_name: humanName.trim(),
+          dog_name: dogName.trim(),
+          date: selectedDate,
+          emotion_home: emotionHome,
+          emotion_outside: noWalk ? null : emotionOutside,
+          no_walk: noWalk,
+          stimuli, triggers, barks,
+          notes: notes.trim(),
+        };
+        await supaFetch("/journal_entries", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
       const updated = await supaFetch(
         `/journal_entries?human_name=ilike.${encodeURIComponent(humanName.trim())}&dog_name=ilike.${encodeURIComponent(dogName.trim())}&order=date.asc`
       );
@@ -588,6 +640,48 @@ function ClientView() {
       <h2 style={styles.h2}>Bonjour, {humanName} ! 🐾</h2>
       <p style={{ ...styles.subtitle, marginBottom: 16 }}>Journal de <strong>{dogName}</strong></p>
 
+      {/* Messages from behaviourist */}
+      {messages.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          {messages.slice(0, 1).map(msg => (
+            <div key={msg.id} style={{ background: colors.teal + "12", border: `2px solid ${colors.teal}30`, borderRadius: 16, padding: "14px 16px" }}>
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13, color: colors.teal, margin: "0 0 6px" }}>
+                💬 Message de votre comportementaliste
+              </p>
+              <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: colors.text, margin: 0, lineHeight: 1.6 }}>
+                {msg.message}
+              </p>
+              {msg.article_id && msg.article && (
+                <div style={{ marginTop: 10, background: colors.card, borderRadius: 10, padding: "8px 12px", border: `1px solid ${colors.border}` }}>
+                  <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 12, color: colors.muted, margin: "0 0 2px" }}>📚 Ressource suggérée</p>
+                  <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700, color: colors.dark, margin: 0 }}>{msg.article_title}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upcoming appointments */}
+      {appointments.length > 0 && (
+        <div style={{ background: colors.gold + "15", border: `2px solid ${colors.gold}40`, borderRadius: 16, padding: "14px 16px", marginBottom: 16 }}>
+          <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13, color: "#9A6E00", margin: "0 0 8px" }}>
+            📅 Vos prochains rendez-vous
+          </p>
+          {appointments.map(apt => (
+            <div key={apt.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 13, color: colors.dark, fontWeight: 600 }}>
+                {new Date(apt.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                {apt.time ? ` à ${apt.time}` : ""}
+              </span>
+              {apt.location && (
+                <span style={{ fontFamily: "'Nunito', sans-serif", fontSize: 11, color: colors.muted }}>📍 {apt.location}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Date picker - aujourd'hui, hier, avant-hier */}
       <div style={{ marginBottom: 18 }}>
         <p style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: colors.text, fontSize: 14, marginBottom: 8 }}>
@@ -692,6 +786,13 @@ function AdminView({ onLogout, onManageResources }) {
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [adminTab, setAdminTab] = useState("journal"); // journal | appointments | message
+  const [appointments, setAppointments] = useState([]);
+  const [newApt, setNewApt] = useState({ date: "", time: "", location: "", notes: "" });
+  const [newMsg, setNewMsg] = useState({ message: "", article_id: "" });
+  const [allArticles, setAllArticles] = useState([]);
+  const [savingApt, setSavingApt] = useState(false);
+  const [savingMsg, setSavingMsg] = useState(false);
 
   useEffect(() => {
     loadDogs();
@@ -715,10 +816,57 @@ function AdminView({ onLogout, onManageResources }) {
 
   async function selectDog(human, dog) {
     setSelected({ human, dog });
+    setAdminTab("journal");
     const data = await supaFetch(
       `/journal_entries?human_name=ilike.${encodeURIComponent(human)}&dog_name=ilike.${encodeURIComponent(dog)}&order=date.desc`
     );
     setDogEntries(data);
+    const appts = await supaFetch(
+      `/appointments?human_name=ilike.${encodeURIComponent(human)}&dog_name=ilike.${encodeURIComponent(dog)}&order=date.asc`
+    );
+    setAppointments(appts);
+    const arts = await supaFetch("/articles?select=id,title&order=title.asc");
+    setAllArticles(arts);
+  }
+
+  async function addAppointment() {
+    if (!newApt.date) return;
+    setSavingApt(true);
+    try {
+      await supaFetch("/appointments", {
+        method: "POST", prefer: "return=minimal",
+        body: JSON.stringify({ human_name: selected.human, dog_name: selected.dog, ...newApt }),
+      });
+      const appts = await supaFetch(`/appointments?human_name=ilike.${encodeURIComponent(selected.human)}&dog_name=ilike.${encodeURIComponent(selected.dog)}&order=date.asc`);
+      setAppointments(appts);
+      setNewApt({ date: "", time: "", location: "", notes: "" });
+    } catch(e) { alert("Erreur : " + e.message); }
+    setSavingApt(false);
+  }
+
+  async function deleteAppointment(id) {
+    await supaFetch(`/appointments?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" });
+    setAppointments(appointments.filter(a => a.id !== id));
+  }
+
+  async function sendMessage() {
+    if (!newMsg.message.trim()) return;
+    setSavingMsg(true);
+    try {
+      await supaFetch("/client_messages", {
+        method: "POST", prefer: "return=minimal",
+        body: JSON.stringify({
+          human_name: selected.human, dog_name: selected.dog,
+          message: newMsg.message.trim(),
+          article_id: newMsg.article_id || null,
+          article_title: newMsg.article_id ? allArticles.find(a => a.id === newMsg.article_id)?.title : null,
+          read: false,
+        }),
+      });
+      setNewMsg({ message: "", article_id: "" });
+      alert("Message envoyé ! ✅");
+    } catch(e) { alert("Erreur : " + e.message); }
+    setSavingMsg(false);
   }
 
   async function deleteDog(human, dog) {
@@ -840,7 +988,7 @@ function AdminView({ onLogout, onManageResources }) {
         </>
       ) : (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <button onClick={() => setSelected(null)} style={{ ...styles.btnSecondary, width: "auto", padding: "10px 18px" }}>
               ← Retour
             </button>
@@ -865,9 +1013,29 @@ function AdminView({ onLogout, onManageResources }) {
           <h3 style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, color: colors.dark, fontSize: 18, marginBottom: 4 }}>
             🐾 {selected.dog}
           </h3>
-          <p style={{ fontFamily: "'Nunito', sans-serif", color: colors.muted, fontSize: 14, marginBottom: 20 }}>
-            Humain : {selected.human} · {dogEntries.length} entrées
+          <p style={{ fontFamily: "'Nunito', sans-serif", color: colors.muted, fontSize: 14, marginBottom: 14 }}>
+            {selected.human} · {dogEntries.length} entrées
           </p>
+
+          {/* Admin tabs */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+            {[
+              { id: "journal", label: "📈 Suivi" },
+              { id: "appointments", label: "📅 RDV" },
+              { id: "message", label: "💬 Message" },
+            ].map(t => (
+              <button key={t.id} onClick={() => setAdminTab(t.id)} style={{
+                padding: "8px 16px", borderRadius: 20, border: "none", cursor: "pointer",
+                fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13,
+                background: adminTab === t.id ? colors.teal : colors.bg,
+                color: adminTab === t.id ? "#fff" : colors.muted,
+                transition: "all 0.15s",
+              }}>{t.label}</button>
+            ))}
+          </div>
+
+          {/* TAB: Journal */}
+          {adminTab === "journal" && <>
 
           <ProgressChart entries={[...dogEntries].reverse()} title={`Évolution de ${selected.dog}`} />
 
