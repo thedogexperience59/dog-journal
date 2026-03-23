@@ -1,0 +1,29 @@
+name: 🐾 Supabase Heartbeat
+
+on:
+  schedule:
+    # Runs every 3 days at 8:00 AM UTC (9:00 AM Paris time)
+    - cron: '0 8 */3 * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase to prevent pause
+        run: |
+          echo "🐾 Sending heartbeat to Supabase..."
+          
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/journal_entries?limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          
+          echo "Response code: $RESPONSE"
+          
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Supabase is alive and responding!"
+          else
+            echo "⚠️ Unexpected response: $RESPONSE"
+            exit 1
+          fi
